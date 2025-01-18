@@ -1,0 +1,362 @@
+{
+  "metadata": {
+    "center": {
+      "latitude": 35.6812,
+      "longitude": 139.7671
+    },
+    "radius_meters": 1000,
+    "total_queries": 50
+  },
+  "query_locations": [
+    {
+      "query": "Where is the nearest public restroom?",
+      "location": {
+        "latitude": 35.678901573056706,
+        "longitude": 139.76627065801048
+      }
+    },
+    {
+      "query": "Find me a Starbucks.",
+      "location": {
+        "latitude": 35.67965575428708,
+        "longitude": 139.7670378090866
+      }
+    },
+    {
+      "query": "Locate a coffee shop nearby.",
+      "location": {
+        "latitude": 35.67907632563994,
+        "longitude": 139.76207258445538
+      }
+    },
+    {
+      "query": "Show me nearby parks.",
+      "location": {
+        "latitude": 35.67248658585908,
+        "longitude": 139.76601958321953
+      }
+    },
+    {
+      "query": "Where is a water fountain?",
+      "location": {
+        "latitude": 35.67349247517106,
+        "longitude": 139.76271585417047
+      }
+    },
+    {
+      "query": "Lead me to a statue.",
+      "location": {
+        "latitude": 35.68782037348211,
+        "longitude": 139.76745353381483
+      }
+    },
+    {
+      "query": "Find the nearest library.",
+      "location": {
+        "latitude": 35.681461459091516,
+        "longitude": 139.7670495699606
+      }
+    },
+    {
+      "query": "Where can I find a playground?",
+      "location": {
+        "latitude": 35.681452671517235,
+        "longitude": 139.75961742192868
+      }
+    },
+    {
+      "query": "Show me the closest ATM.",
+      "location": {
+        "latitude": 35.67829128332358,
+        "longitude": 139.76370389261214
+      }
+    },
+    {
+      "query": "Locate a public parking lot.",
+      "location": {
+        "latitude": 35.68361552535344,
+        "longitude": 139.75848722131053
+      }
+    },
+    {
+      "query": "Where can I get bottled water?",
+      "location": {
+        "latitude": 35.673247651139555,
+        "longitude": 139.77113359910845
+      }
+    },
+    {
+      "query": "Find a bookstore.",
+      "location": {
+        "latitude": 35.68218655962964,
+        "longitude": 139.76012519908042
+      }
+    },
+    {
+      "query": "Show me a bike rental station.",
+      "location": {
+        "latitude": 35.67529290100565,
+        "longitude": 139.76599129426583
+      }
+    },
+    {
+      "query": "Locate a pet-friendly park.",
+      "location": {
+        "latitude": 35.67752498876911,
+        "longitude": 139.7683667307779
+      }
+    },
+    {
+      "query": "Find a public swimming pool.",
+      "location": {
+        "latitude": 35.6895788396032,
+        "longitude": 139.7666520535177
+      }
+    },
+    {
+      "query": "Where is the nearest hiking trail?",
+      "location": {
+        "latitude": 35.686868607193006,
+        "longitude": 139.77025385758162
+      }
+    },
+    {
+      "query": "Show me a flower garden.",
+      "location": {
+        "latitude": 35.67859868723602,
+        "longitude": 139.77300292906784
+      }
+    },
+    {
+      "query": "Locate a historical monument.",
+      "location": {
+        "latitude": 35.68167312829723,
+        "longitude": 139.77138069086797
+      }
+    },
+    {
+      "query": "Find a bus stop.",
+      "location": {
+        "latitude": 35.68179527834876,
+        "longitude": 139.7738844646767
+      }
+    },
+    {
+      "query": "Show me a grocery store.",
+      "location": {
+        "latitude": 35.68210588122873,
+        "longitude": 139.7692283002339
+      }
+    },
+    {
+      "query": "Where can I charge my phone?",
+      "location": {
+        "latitude": 35.67608981452287,
+        "longitude": 139.76603481035536
+      }
+    },
+    {
+      "query": "Locate a pharmacy.",
+      "location": {
+        "latitude": 35.68443176447757,
+        "longitude": 139.77201404517209
+      }
+    },
+    {
+      "query": "Find a bench to sit on.",
+      "location": {
+        "latitude": 35.680854100882605,
+        "longitude": 139.76600834520505
+      }
+    },
+    {
+      "query": "Show me a public art installation.",
+      "location": {
+        "latitude": 35.680698666799834,
+        "longitude": 139.76601742377798
+      }
+    },
+    {
+      "query": "Locate a souvenir shop.",
+      "location": {
+        "latitude": 35.683267268120964,
+        "longitude": 139.76078427621553
+      }
+    },
+    {
+      "query": "Find a convenience store.",
+      "location": {
+        "latitude": 35.67646133433306,
+        "longitude": 139.75910432285815
+      }
+    },
+    {
+      "query": "Where is a food truck nearby?",
+      "location": {
+        "latitude": 35.6815000867112,
+        "longitude": 139.76385053576047
+      }
+    },
+    {
+      "query": "Show me a farmers market.",
+      "location": {
+        "latitude": 35.68465016100929,
+        "longitude": 139.75791159746794
+      }
+    },
+    {
+      "query": "Locate a playground for kids.",
+      "location": {
+        "latitude": 35.6811895528178,
+        "longitude": 139.76483870899463
+      }
+    },
+    {
+      "query": "Find a dog park.",
+      "location": {
+        "latitude": 35.68356609697364,
+        "longitude": 139.7698251362297
+      }
+    },
+    {
+      "query": "Show me a rooftop caf\u00e9.",
+      "location": {
+        "latitude": 35.68345870066933,
+        "longitude": 139.77564167875803
+      }
+    },
+    {
+      "query": "Locate a coworking space.",
+      "location": {
+        "latitude": 35.6817905560797,
+        "longitude": 139.76825554790977
+      }
+    },
+    {
+      "query": "Find a gym.",
+      "location": {
+        "latitude": 35.680598440447966,
+        "longitude": 139.76327820230253
+      }
+    },
+    {
+      "query": "Where is the nearest hotel?",
+      "location": {
+        "latitude": 35.68520039222255,
+        "longitude": 139.7762855439771
+      }
+    },
+    {
+      "query": "Show me a beach access point.",
+      "location": {
+        "latitude": 35.67751255367137,
+        "longitude": 139.758399619548
+      }
+    },
+    {
+      "query": "Locate a museum.",
+      "location": {
+        "latitude": 35.68029060265289,
+        "longitude": 139.76198318892148
+      }
+    },
+    {
+      "query": "Find a public library.",
+      "location": {
+        "latitude": 35.68094281166674,
+        "longitude": 139.76688243473458
+      }
+    },
+    {
+      "query": "Where can I buy snacks?",
+      "location": {
+        "latitude": 35.679866365225735,
+        "longitude": 139.76710353960317
+      }
+    },
+    {
+      "query": "Show me an ice cream shop.",
+      "location": {
+        "latitude": 35.67944085204921,
+        "longitude": 139.76804772244057
+      }
+    },
+    {
+      "query": "Locate a movie theater.",
+      "location": {
+        "latitude": 35.67952115992358,
+        "longitude": 139.76722011979825
+      }
+    },
+    {
+      "query": "Find a yoga studio.",
+      "location": {
+        "latitude": 35.67464733221549,
+        "longitude": 139.77268741772966
+      }
+    },
+    {
+      "query": "Where is a public restroom with baby changing facilities?",
+      "location": {
+        "latitude": 35.683384593808704,
+        "longitude": 139.76177518443959
+      }
+    },
+    {
+      "query": "Show me a skate park.",
+      "location": {
+        "latitude": 35.68069186456956,
+        "longitude": 139.7665745812447
+      }
+    },
+    {
+      "query": "Locate a seafood restaurant.",
+      "location": {
+        "latitude": 35.67629663122874,
+        "longitude": 139.77585011697406
+      }
+    },
+    {
+      "query": "Find a vegan caf\u00e9.",
+      "location": {
+        "latitude": 35.68075703145344,
+        "longitude": 139.76739846602052
+      }
+    },
+    {
+      "query": "Show me a public charging station for electric vehicles.",
+      "location": {
+        "latitude": 35.680573132245534,
+        "longitude": 139.75809025339285
+      }
+    },
+    {
+      "query": "Locate a street food vendor.",
+      "location": {
+        "latitude": 35.68032336942816,
+        "longitude": 139.76424020269343
+      }
+    },
+    {
+      "query": "Find a public square.",
+      "location": {
+        "latitude": 35.68197308541478,
+        "longitude": 139.77126897034677
+      }
+    },
+    {
+      "query": "Where is a viewpoint?",
+      "location": {
+        "latitude": 35.685628949111376,
+        "longitude": 139.77278819790743
+      }
+    },
+    {
+      "query": "Show me an observation deck.",
+      "location": {
+        "latitude": 35.681238031847286,
+        "longitude": 139.76766025237615
+      }
+    }
+  ]
+}
