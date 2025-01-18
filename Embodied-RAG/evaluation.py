@@ -452,13 +452,14 @@ Rate the relevance of this image on a scale of 1-5:"""
 
     def compute_spatial_relativity(self, query_location: Dict, retrieved_nodes: List[Dict]) -> float:
         """
-        Compute spatial relativity as normalized distances (0-1)
+        Compute spatial relativity using exponential decay without a hard threshold
         """
         if not retrieved_nodes:
             return 0.0
 
-        max_distance = self.radius  # Use radius as normalizing factor
         distances = []
+        decay_factor = 0.005  # Controls how quickly the score decays with distance
+                         # Smaller value = slower decay, larger value = faster decay
 
         for node in retrieved_nodes[:self.k]:
             try:
@@ -470,8 +471,14 @@ Rate the relevance of this image on a scale of 1-5:"""
                 
                 # Compute distance
                 distance = self.compute_haversine_distance(query_location, node_loc)
-                normalized_distance = max(0, 1 - (distance / max_distance))
-                distances.append(normalized_distance)
+                
+                # Use exponential decay: score = e^(-decay_factor * distance)
+                score = np.exp(-decay_factor * distance)
+                distances.append(score)
+                
+                # Debug output
+                print(f"Distance: {distance:.1f}m, Score: {score:.4f}")
+                
             except Exception as e:
                 print(f"Error computing distance: {str(e)}")
                 distances.append(0.0)
