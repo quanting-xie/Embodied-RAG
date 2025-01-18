@@ -35,7 +35,7 @@ class LLMInterface:
         print(f"- Base URL: {self.client.base_url}")
 
 
-    async def generate_response(self, prompt, system_prompt=None):
+    async def generate_response(self, prompt: str, system_prompt: str = None, image_base64: str = None) -> str:
         """Base method for generating responses from the LLM"""
         if system_prompt is None:
             system_prompt = ""
@@ -43,7 +43,22 @@ class LLMInterface:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
+        
+        if image_base64:
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_base64}"
+                        }
+                    }
+                ]
+            })
+        else:
+            messages.append({"role": "user", "content": prompt})
 
         for attempt in range(self.max_retries):
             try:

@@ -129,8 +129,6 @@ class EnvironmentalChat:
         If return_nodes is True, returns the reranked base nodes instead of context string.
         """
         try:
-
-            
             # Generate query embedding
             query_embedding = await self.llm.client.embeddings.create(
                 model="text-embedding-ada-002",
@@ -210,7 +208,11 @@ class EnvironmentalChat:
                         'semantic_score': semantic_score,
                         'spatial_score': spatial_score,
                         'distance': dist,
-                        'type': node.payload.get('type', 'base')
+                        'type': node.payload.get('type', 'base'),
+                        'original_id': {
+                            'node_id': node.payload.get('original_id', {}).get('node_id'),
+                            'graph_id': node.payload.get('original_id', {}).get('graph_id')
+                        }
                     }
                     reranked_nodes.append(reranked_node)
                     
@@ -230,26 +232,55 @@ class EnvironmentalChat:
                       f"spatial: {node['spatial_score']:.4f}, "
                       f"distance: {node['distance']:.1f}m)")
             
-            if return_nodes:
-                return reranked_nodes[:config.Config.RETRIEVAL['reranking']['top_k']]
-            
             # Generate context string from top-k reranked nodes
             context_nodes = reranked_nodes[:config.Config.RETRIEVAL['reranking']['top_k']]
-            context_texts = []
+            context_texts = ["Available locations with their hierarchical relationships:"]
             
-            for node in context_nodes:
-                context_texts.append(f"\nLocation: {node['name']}\n"
-                                   f"Description: {node['caption']}\n"
-                                   f"Position: {node['position']}")
+            for base_node in context_nodes:
+                node_id = base_node['original_id']['node_id']
+                date_str = base_node['original_id']['graph_id']
+                
+                hierarchy_chain = self._get_node_hierarchy(node_id, date_str)
+                
+                context_texts.append("\nLocation Hierarchy:")
+                
+                # Start with highest level parent
+                for i, node in enumerate(hierarchy_chain[:-1]):  # All except base node
+                    indent = "  " * i
+                    context_texts.append(f"{indent}Level {node['level']} Area:")
+                    context_texts.append(f"{indent}{{")
+                    context_texts.append(f"{indent}  \"name\": \"{node['name']}\",")
+                    context_texts.append(f"{indent}  \"caption\": \"{node['caption']}\",")
+                    context_texts.append(f"{indent}  \"type\": \"{node['type']}\",")
+                    context_texts.append(f"{indent}  \"level\": {node['level']}")
+                    context_texts.append(f"{indent}}} contains ↓")
+                
+                # Add base node with full details
+                indent = "  " * (len(hierarchy_chain) - 1)
+                context_texts.append(f"{indent}Base Location:")
+                context_texts.append(f"{indent}{{")
+                context_texts.append(f"{indent}  \"name\": \"{base_node['name']}\",")
+                context_texts.append(f"{indent}  \"caption\": \"{base_node['caption']}\",")
+                context_texts.append(f"{indent}  \"position\": {json.dumps(base_node['position'])},")
+                context_texts.append(f"{indent}  \"image_path\": \"{base_node['image_path']}\",")
+                context_texts.append(f"{indent}  \"score\": {base_node['score']:.4f},")
+                context_texts.append(f"{indent}  \"parent_areas\": {json.dumps([n['name'] for n in hierarchy_chain[:-1]])}")
+                context_texts.append(f"{indent}}}")
+                context_texts.append("---")
             
-            return "\n\n".join(context_texts)
+            context = "\n".join(context_texts)
+            print("============Context: ", context)  # Debug print
             
+            if return_nodes:
+                return context_nodes
+            return context
+
         except Exception as e:
             print(f"Error in retrieve_hierarchical_context: {str(e)}")
             print(traceback.format_exc())
             return [] if return_nodes else ""
 
-    def _get_node_hierarchy(self, base_node_id: str, date_str: str) -> List[str]:
+    def _get_node_hierarchy(self, base_node_id: str, date_str: str) -> List[Dict]:
         """Helper method to get the hierarchical chain of nodes"""
         node_chain = []
         current_node = base_node_id
@@ -263,8 +294,13 @@ class EnvironmentalChat:
                 break
             
             node_data = G.nodes[current_node]
-            node_text = self.format_node_info(node_data, current_node)
-            node_chain.append(node_text)
+            node_chain.append({
+                'name': node_data.get('name', ''),
+                'caption': node_data.get('caption', ''),
+                'type': node_data.get('type', 'base'),
+                'level': node_data.get('level', 0),
+                'node_id': current_node
+            })
             
             # Find parent (node with higher level)
             parents = [n for n in G.neighbors(current_node) 
@@ -291,9 +327,8 @@ class EnvironmentalChat:
             # Base level node
             node_info.extend([
                 f"Name: {node_data.get('name', '')}",
-                f"Description: {node_data.get('caption', '')}",
-                f"Position: {node_data.get('position', {})}",
-                f"Image Path: {node_data.get('image_path', '')}"
+                f"caption: {node_data.get('caption', '')}",
+                f"image_path: {node_data.get('image_path', '')}"
             ])
         
         return "\n".join(filter(None, node_info))
@@ -301,9 +336,7 @@ class EnvironmentalChat:
     async def generate_response(self, query: str, context: str) -> str:
         """Generate a response based on the query and retrieved context"""
         
-        # Get the last two chat interactions
         history_length = 3
-
         recent_history = ""
         if len(self.chat_history) >= history_length:
             for chat in self.chat_history[-2:]:
@@ -320,29 +353,58 @@ class EnvironmentalChat:
         {context}
 
         Instructions:
-        1. Focus on directly answering the query using the provided context
-        2. Provide clear, factual information about the environmental conditions
-        3. Use the context to provide a detailed analysis of the environment
-
+        1. If the query is asking for a specific location, provide the best one answer based on the context, in the EXACT following parseable format: 
+            1.1 Choose the SINGLE best location from the base locations that best matches the query
+            1.2 Consider the entire hierarchical context - a location's parent areas may provide important context
+            1.3 Return your answer in the EXACT following JSON format:
+            {{
+                "name": "Best matching base location name",
+                "caption": "Best matching base location caption",
+                "position": {{
+                    "x": "Best matching x coordinate",
+                    "y": "Best matching y coordinate"
+                }},
+                "image_path": "Best matching image_path",
+                "parent_areas": ["List of parent area names"],
+                "reasons": "Explain why this location is the best match, including how its parent areas contribute to the decision"
+            }}
+        2. If the query is asking for a general environmental analysis, provide a detailed analysis of the environment based on the context.
         """
         
         return await self.llm.generate_response(prompt)
 
     async def generate_response_no_history(self, query: str, context: str) -> str:
         """Generate a response without considering chat history"""
+        # Use double curly braces to escape JSON template
         prompt = f"""As an environmental analysis expert, answer the following query using the provided context information:
-
-        Query: {query}
+        
+        Current Query: {query}
 
         Context Information:
         {context}
 
         Instructions:
-        1. Focus on directly answering the query using the provided context
-        2. Provide clear, factual information about the environmental conditions
-        3. Use the context to provide a detailed analysis of the environment
+        1. If the query is asking for a specific location, provide the best one answer based on the context, in the EXACT following parseable format: 
+            1.1 Choose the SINGLE best location from the base locations that best matches the query
+            1.2 Consider the entire hierarchical context - a location's parent areas may provide important context
+            1.3 Return your answer in the EXACT following JSON format:
+            {{
+                "name": "Best matching base location name",
+                "caption": "Best matching base location caption",
+                "position": {{
+                    "x": "Best matching x coordinate",
+                    "y": "Best matching y coordinate"
+                }},
+                "image_path": "Best matching image_path",
+                "parent_areas": ["List of parent area names"],
+                "reasons": "Explain why this location is the best match, including how its parent areas contribute to the decision"
+            }}
+
+
+        2. If the query is asking for a general environmental analysis, provide a detailed analysis of the environment based on the context.
         """
         
+        print("============Context: ", context)
         return await self.llm.generate_response(prompt)
 
     async def chat(self):

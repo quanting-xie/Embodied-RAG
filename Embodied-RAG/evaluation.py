@@ -15,6 +15,7 @@ import webbrowser
 import uuid
 import base64
 import argparse
+import traceback
 
 class RetrievalEvaluator:
     def __init__(self, graph_path: str = None, vector_db_path: str = None, image_dir: str = None):
@@ -184,32 +185,21 @@ class RetrievalEvaluator:
                 encoded_image = None
                 
                 if image_path:
-                    # Convert to Path object and resolve relative paths
-                    image_path = Path(image_path)
-                    if not image_path.is_absolute():
-                        # Try different base directories
-                        possible_paths = [
-                            self.image_dir / image_path.name,
-                            Path(image_path),
-                            Path(os.getcwd()) / image_path
-                        ]
-                        
-                        for path in possible_paths:
-                            if path.exists():
-                                image_path = path
-                                break
-                        else:
-                            print(f"Warning: Could not find image at any of:")
-                            for p in possible_paths:
-                                print(f"  - {p}")
+                    # Use consistent path resolution
+                    image_name = Path(image_path).name
+                    absolute_image_path = self.image_dir / image_name  # Use self.image_dir directly
+                    
+                    print(f"Trying to load image from: {absolute_image_path}")
                     
                     # Try to read the image if path exists
-                    if image_path.exists():
+                    if absolute_image_path.exists():
                         try:
-                            with open(image_path, 'rb') as img_file:
+                            with open(absolute_image_path, 'rb') as img_file:
                                 encoded_image = base64.b64encode(img_file.read()).decode()
                         except Exception as e:
-                            print(f"Error reading image file {image_path}: {str(e)}")
+                            print(f"Error reading image file {absolute_image_path}: {str(e)}")
+                    else:
+                        print(f"Image not found at: {absolute_image_path}")
                 
                 # Create popup HTML
                 popup_html = f"""
@@ -360,36 +350,64 @@ class RetrievalEvaluator:
         return ground_truth_locations
 
     async def compute_semantic_relativity(self, query: str, retrieved_nodes: List[Dict]) -> Dict[str, float]:
-        """
-        Compute semantic relativity using GPT-4 to score relevance on a 1-5 Likert scale
-        Returns scores for both top-1 and top-5 results
-        """
-        system_prompt = """You are an expert evaluator. Rate the relevance of the image description 
-        given a user's query on a scale of 1-5, where:
+        """Compute semantic relativity using GPT-4 to score relevance"""
+        system_prompt = """You are an expert evaluator. Rate the relevance of the location given a user's query on a scale of 1-5, where:
         1 = Completely irrelevant
         2 = Somewhat irrelevant
         3 = Moderately relevant
         4 = Very relevant
         5 = Perfectly relevant
         
-        Consider the visual content in your evaluation.
-        The image should match the query intent.
+        Consider both the visual content and the hierarchical context in your evaluation.
         Return only the numerical score without explanation."""
 
         async def get_score_for_node(node, attempt_num):
             try:
-                # Format single node with focus on image description
-                location_text = f"Image Description: {node.get('caption', 'No description')}"
+                # Get image path
+                image_path = node.get('image_path', '')
+                if not image_path:
+                    print(f"Attempt {attempt_num}: No image path available")
+                    return None
+
+                # Use consistent path resolution
+                image_name = Path(image_path).name
+                absolute_image_path = self.image_dir / image_name  # Use self.image_dir directly
+                
+                print(f"Looking for image at: {absolute_image_path}")
+
+                if not absolute_image_path.exists():
+                    print(f"Attempt {attempt_num}: Image not found at {absolute_image_path}")
+                    return None
+
+                # Read and encode image
+                try:
+                    with open(absolute_image_path, 'rb') as img_file:
+                        encoded_image = base64.b64encode(img_file.read()).decode()
+                except Exception as e:
+                    print(f"Attempt {attempt_num}: Error reading image file: {str(e)}")
+                    return None
+
+                # Format location with image and hierarchical context
+                location_text = (
+                    f"Location Name: {node.get('name', 'Unnamed')}\n"
+                    f"Parent Areas: {node.get('parent_areas', [])}\n"
+                    f"Visual Content: [Image Attached]\n"
+                    f"Description: {node.get('caption', 'No description')}"
+                )
 
                 prompt = f"""Query: {query}
 
-Image Content:
+Location Information:
 {location_text}
 
-Rate the relevance of this image on a scale of 1-5:"""
+Rate the relevance of this location on a scale of 1-5:"""
 
-                # Get score from GPT-4
-                response = await self.chat.llm.generate_response(prompt, system_prompt)
+                # Get score from GPT-4 with image
+                response = await self.chat.llm.generate_response(
+                    prompt, 
+                    system_prompt,
+                    image_base64=encoded_image
+                )
                 try:
                     score = float(response.strip())
                     if 1 <= score <= 5:
@@ -402,52 +420,35 @@ Rate the relevance of this image on a scale of 1-5:"""
                 
             except Exception as e:
                 print(f"Attempt {attempt_num}: Error: {str(e)}")
+                traceback.print_exc()
             return None
 
-        async def get_scores_for_node(node):
-            scores = []
-            print(f"\nEvaluating image: {node.get('name', 'unnamed')}")
-            print(f"Caption: {node.get('caption', 'No description')[:200]}...")
+        scores_per_node = []
+        for i, node in enumerate(retrieved_nodes[:5]):  # Only evaluate top 5
+            node_scores = []
+            num_attempts = 5
             
-            for attempt in range(5):
+            for attempt in range(num_attempts):
                 score = await get_score_for_node(node, attempt + 1)
                 if score is not None:
-                    scores.append(score)
+                    node_scores.append(score)
+                    print(f"Node {i+1}, Attempt {attempt + 1}: Score = {score}")
             
-            if scores:
-                avg_score = sum(scores) / len(scores)
-                print(f"\nScores for this image: {scores}")
-                print(f"Average score: {avg_score:.2f}")
-                print(f"Normalized score (0-1): {avg_score / 5:.2f}")
-                return avg_score / 5
-            else:
-                print("No valid scores received for this image")
-                return 0.0
+            if node_scores:
+                # Average the scores for this node
+                avg_score = sum(node_scores) / len(node_scores)
+                scores_per_node.append(avg_score)
+                print(f"Node {i+1} Average Score: {avg_score:.4f}")
 
-        # Evaluate top-1
-        print("\nEvaluating Top-1 Result:")
-        top1_score = await get_scores_for_node(retrieved_nodes[0]) if retrieved_nodes else 0.0
+        if not scores_per_node:
+            return {'top1': 0.0, 'top5': 0.0}
 
-        # Evaluate top-5 individually
-        print("\nEvaluating Top-5 Results:")
-        top5_scores = []
-        for i, node in enumerate(retrieved_nodes[:5]):
-            print(f"\n--- Result #{i+1} ---")
-            score = await get_scores_for_node(node)
-            top5_scores.append(score)
+        # Normalize scores to 0-1 range
+        normalized_scores = [float(score - 1) / 4 for score in scores_per_node]
         
-        # Average the top-5 scores
-        top5_average = sum(top5_scores) / len(top5_scores) if top5_scores else 0.0
-        
-        print("\nTop-5 Summary:")
-        for i, score in enumerate(top5_scores):
-            print(f"Result #{i+1}: {score:.2f}")
-        print(f"Average of top-5: {top5_average:.2f}")
-
         return {
-            'top1': top1_score,
-            'top5': top5_average,
-            'individual_scores': top5_scores
+            'top1': normalized_scores[0] if normalized_scores else 0.0,
+            'top5': sum(normalized_scores) / len(normalized_scores) if normalized_scores else 0.0
         }
 
     def compute_spatial_relativity(self, query_location: Dict, retrieved_nodes: List[Dict]) -> float:
@@ -485,43 +486,110 @@ Rate the relevance of this image on a scale of 1-5:"""
 
         return sum(distances) / len(distances) if distances else 0.0
 
+    async def evaluate_generated_response(self, query: str, generated_response: str, retrieved_nodes: List[Dict]) -> Dict:
+        try:
+            # Parse the generated response as JSON
+            try:
+                response_data = json.loads(generated_response.strip('`json\n'))  # Remove markdown formatting
+                generated_node = {
+                    'name': response_data.get('name', ''),
+                    'caption': response_data.get('caption', ''),
+                    'position': response_data.get('position', {}),
+                    'image_path': response_data.get('image_path', ''),
+                    'parent_areas': response_data.get('parent_areas', []),
+                    'reasons': response_data.get('reasons', '')
+                }
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Warning: Error parsing generated response: {str(e)}")
+                print(f"Generated response: {generated_response}")
+                return None
+
+            print("\n=== Evaluating Generated Response ===")
+            print(f"Generated Location: {generated_node['name']}")
+            
+            # Score the generated result using the same image directory
+            image_name = Path(generated_node['image_path']).name
+            generated_node['image_path'] = str(self.image_dir / image_name)
+            
+            # Get semantic score with multiple attempts
+            semantic_scores = []
+            num_attempts = 5
+            for attempt in range(num_attempts):
+                score = await self.compute_semantic_relativity(query, [generated_node])
+                if score['top1'] is not None:
+                    semantic_scores.append(score['top1'])
+                    print(f"Attempt {attempt + 1} Semantic Score: {score['top1']:.4f}")
+            
+            # Average the semantic scores
+            avg_semantic_score = sum(semantic_scores) / len(semantic_scores) if semantic_scores else 0.0
+            
+            # Get spatial score using retrieved nodes for comparison
+            spatial_score = self.compute_spatial_relativity(
+                {'latitude': float(generated_node['position']['y']), 
+                 'longitude': float(generated_node['position']['x'])}, 
+                retrieved_nodes  # Use retrieved nodes instead of [generated_node]
+            )
+            
+            # Calculate combined score
+            final_score = avg_semantic_score * spatial_score
+            
+            generation_evaluation = {
+                'semantic_score': avg_semantic_score,
+                'spatial_score': spatial_score,
+                'combined_score': final_score
+            }
+            
+            print("\n=== Generation Evaluation Results ===")
+            print(f"Average Semantic Score ({len(semantic_scores)} attempts): {avg_semantic_score:.4f}")
+            print(f"Spatial Score: {spatial_score:.4f}")
+            print(f"Combined Score: {final_score:.4f}")
+            
+            return generation_evaluation
+            
+        except Exception as e:
+            print(f"Error evaluating generated response: {str(e)}")
+            traceback.print_exc()
+            return None
+
     async def evaluate_query(self, query_item: Dict) -> Dict:
-        """Evaluate a single query with semantic-spatial metrics"""
+        """Modified evaluate_query to include generation evaluation"""
         query = query_item['query']
         agent_location = query_item['location']
         use_history = query_item.get('use_history', False)
         
         try:
             print("\nRetrieving context...")
+            # Get both the nodes and the hierarchical context
+            context = await self.chat.retrieve_hierarchical_context(
+                query=query,
+                agent_location=agent_location,
+                return_nodes=False  # Get the formatted hierarchical context
+            )
+            
+            # Get nodes separately for evaluation
             retrieved_nodes = await self.chat.retrieve_hierarchical_context(
                 query=query,
                 agent_location=agent_location,
                 return_nodes=True
             )
-            print("Debug: retrieved_nodes", retrieved_nodes)
             
             print(f"\nFound {len(retrieved_nodes)} locations")
             if retrieved_nodes:
                 print("\nFirst retrieved location:")
                 print(json.dumps(retrieved_nodes[0], indent=2))
             
-            # Generate context string for LLM response
-            context_texts = []
-            for node in retrieved_nodes[:self.k]:
-                context_texts.append(f"\nLocation: {node['name']}\n"
-                                   f"Description: {node['caption']}\n"
-                                   f"Position: {node['position']}")
-            context = "\n\n".join(context_texts)
-            
-            # Generate response
+            # Generate response using the hierarchical context
             if use_history:
                 response = await self.chat.generate_response(query, context)
             else:
                 response = await self.chat.generate_response_no_history(query, context)
             
-            # Compute new metrics
+            # Compute retrieval metrics
             semantic_scores = await self.compute_semantic_relativity(query, retrieved_nodes)
             spatial_score = self.compute_spatial_relativity(agent_location, retrieved_nodes)
+            
+            # Evaluate generated response
+            generation_scores = await self.evaluate_generated_response(query, response, retrieved_nodes)
             
             # Calculate final semantic-spatial scores
             final_scores = {
@@ -542,7 +610,8 @@ Rate the relevance of this image on a scale of 1-5:"""
                 'metrics': {
                     'semantic_relativity': semantic_scores,
                     'spatial_relativity': spatial_score,
-                    'semantic_spatial_score': final_scores
+                    'semantic_spatial_score': final_scores,
+                    'generation_evaluation': generation_scores
                 },
                 'retrieved_count': len(retrieved_nodes),
                 'success': len(retrieved_nodes) > 0
@@ -552,15 +621,8 @@ Rate the relevance of this image on a scale of 1-5:"""
             print(f"Error evaluating query: {str(e)}")
             print(traceback.format_exc())
             return {
-                'query': query,
-                'use_history': use_history,
                 'error': str(e),
-                'error_traceback': traceback.format_exc(),
-                'metrics': {
-                    'semantic_relativity': {'top1': 0.0, 'top5': 0.0},
-                    'spatial_relativity': 0.0,
-                    'semantic_spatial_score': {'top1': 0.0, 'top5': 0.0}
-                }
+                'success': False
             }
 
     async def run_evaluation(self):
